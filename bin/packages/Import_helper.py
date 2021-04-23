@@ -22,7 +22,7 @@ def is_valid_uuid_v4(UUID):
     except:
         return False
 
-def create_import_queue(tags, galaxy, paste_content, UUID,  password=None, isfile = False):
+def create_import_queue(tags, galaxy, paste_content, UUID,  password=None, isfile = False, source=None):
 
     # save temp value on disk
     for tag in tags:
@@ -34,6 +34,9 @@ def create_import_queue(tags, galaxy, paste_content, UUID,  password=None, isfil
 
     if password:
         r_serv_db.set(UUID + ':password', password)
+    
+    if source:
+        r_serv_db.set(UUID + ':source', source)
 
     r_serv_db.set(UUID + ':isfile', isfile)
 

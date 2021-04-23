@@ -231,6 +231,8 @@ function launching_scripts {
     screen -S "Script_AIL" -X screen -t "SubmitPaste" bash -c "cd ${AIL_BIN}; ${ENV_PY} ./submit_paste.py; read x"
     sleep 0.1
     screen -S "Script_AIL" -X screen -t "IPAddress" bash -c "cd ${AIL_BIN}; ${ENV_PY} ./IPAddress.py; read x"
+    sleep 0.1
+    screen -S "Script_AIL" -X screen -t "ComboLeak" bash -c "cd ${AIL_BIN}; ${ENV_PY} ./combo_leak.py; read x"
 
 }
 
@@ -400,6 +402,7 @@ function launch_flask {
         screen -dmS "Flask_AIL"
         sleep 0.1
         echo -e $GREEN"\t* Launching Flask server"$DEFAULT
+        export FLASK_DEBUG=1
         screen -S "Flask_AIL" -X screen -t "Flask_server" bash -c "cd $flask_dir; ls; ${ENV_PY} ./Flask_server.py; read x"
     else
         echo -e $RED"\t* A Flask screen is already launched"$DEFAULT
@@ -413,7 +416,7 @@ function launch_feeder {
         echo -e $GREEN"\t* Launching Pystemon feeder"$DEFAULT
         screen -S "Feeder_Pystemon" -X screen -t "Pystemon_feeder" bash -c "cd ${AIL_BIN}; ${ENV_PY} ./feeder/pystemon-feeder.py; read x"
         sleep 0.1
-        screen -S "Feeder_Pystemon" -X screen -t "Pystemon" bash -c "cd ${AIL_HOME}/../pystemon; ${ENV_PY} ./pystemon.py; read x"
+        # screen -S "Feeder_Pystemon" -X screen -t "Pystemon" bash -c "cd ${AIL_HOME}/../pystemon; ${ENV_PY} ./pystemon.py; read x"
     else
         echo -e $RED"\t* A Feeder screen is already launched"$DEFAULT
     fi

@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 # -*-coding:UTF-8 -*
 
+##################################
+# Import External packages
+##################################
 import os
 import re
 import sys
 import redis
 import cld3
 import html2text
-
+from bs4 import BeautifulSoup
 from io import BytesIO
 
+##################################
+# Import Project packages
+##################################
 sys.path.append(os.path.join(os.environ['AIL_BIN'], 'packages/'))
 import Date
 import Tag
@@ -111,6 +117,22 @@ def get_item_content_html2text(item_id, item_content=None, ignore_links=False):
     h.ignore_links = ignore_links
     h.ignore_images = ignore_links
     return h.handle(item_content)
+
+
+def get_item_content_beautifulsoup(item_id, item_content=None):
+    """
+    Sanitize all HTML tags
+    """
+    if not item_content:
+        item_content = get_item_content(item_id)
+    soup = BeautifulSoup(item_content)
+    # Add newline to br tags to avoid string concatenation by beautifulsoup 
+    #   possible other newlines for tags ["a", "p", "div", "h3", "br"]
+    for elem in soup.find_all(["br"]):
+        elem.append('\n')
+
+    return soup.get_text()
+
 
 def remove_all_urls_from_content(item_id, item_content=None):
     if not item_content:

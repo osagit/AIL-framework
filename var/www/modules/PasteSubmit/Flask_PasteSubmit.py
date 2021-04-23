@@ -4,28 +4,33 @@
 '''
     Flask functions and routes for the trending modules page
 '''
-import redis
-from flask import Flask, render_template, jsonify, request, Blueprint, url_for, redirect
-
-from Role_Manager import login_admin, login_analyst
-from flask_login import login_required
-
-import unicodedata
-import string
-import subprocess
+##################################
+# Import External packages
+##################################
 import os
 import sys
+import json
+import string
+import subprocess
 import datetime
+import redis
+import unicodedata
 import uuid
 from io import BytesIO
 from Date import Date
-import json
 
+from flask import Flask, render_template, jsonify, request, Blueprint, url_for, redirect, abort
+from functools import wraps
+from Role_Manager import login_admin, login_analyst
+from flask_login import login_required
+
+
+##################################
+# Import Project packages
+##################################
 import Paste
-
 import Import_helper
 import Tag
-
 from pytaxonomies import Taxonomies
 from pymispgalaxies import Galaxies, Clusters
 
@@ -49,6 +54,8 @@ r_serv_metadata = Flask_config.r_serv_metadata
 r_serv_db = Flask_config.r_serv_db
 r_serv_log_submit = Flask_config.r_serv_log_submit
 
+logger = Flask_config.redis_logger
+
 pymisp = Flask_config.pymisp
 if pymisp is False:
     flag_misp = False
@@ -61,11 +68,27 @@ PasteSubmit = Blueprint('PasteSubmit', __name__, template_folder='templates')
 
 valid_filename_chars = "-_ %s%s" % (string.ascii_letters, string.digits)
 
-ALLOWED_EXTENSIONS = set(['txt', 'sh', 'pdf', 'zip', 'gz', 'tar.gz'])
 UPLOAD_FOLDER = Flask_config.UPLOAD_FOLDER
 
 misp_event_url = Flask_config.misp_event_url
 hive_case_url = Flask_config.hive_case_url
+
+
+# ============ Validators ============
+def limit_content_length():
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            logger.debug('decorator')
+            cl = request.content_length
+            if cl is not None:
+                if cl > Flask_config.SUBMIT_PASTE_FILE_MAX_SIZE or ('file' not in request.files and cl > Flask_config.SUBMIT_PASTE_TEXT_MAX_SIZE):
+                    logger.debug('abort')
+                    abort(413)
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
 
 # ============ FUNCTIONS ============
 def one():
@@ -75,7 +98,7 @@ def allowed_file(filename):
     if not '.' in filename:
         return True
     else:
-        return filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+        return filename.rsplit('.', 1)[1].lower() in Flask_config.SUBMIT_PASTE_FILE_ALLOWED_EXTENSIONS
 
 def clean_filename(filename, whitelist=valid_filename_chars, replace=' '):
     # replace characters
@@ -197,22 +220,22 @@ def hive_create_case(hive_tlp, threat_level, hive_description, hive_case_title, 
 
         res = HiveApi.create_case_observable(id,observ_sensor)
         if res.status_code != 201:
-            print('ko: {}/{}'.format(res.status_code, res.text))
+            logger.info(f'ko sensor: {res.status_code}/{res.text}')
         res = HiveApi.create_case_observable(id, observ_source)
         if res.status_code != 201:
-            print('ko: {}/{}'.format(res.status_code, res.text))
+            logger.info(f'ko source: {res.status_code}/{res.text}')
         res = HiveApi.create_case_observable(id, observ_file)
         if res.status_code != 201:
-            print('ko: {}/{}'.format(res.status_code, res.text))
+            logger.info(f'ko file: {res.status_code}/{res.text}')
         res = HiveApi.create_case_observable(id, observ_last_seen)
         if res.status_code != 201:
-            print('ko: {}/{}'.format(res.status_code, res.text))
+            logger.info(f'ko last_seen: {res.status_code}/{res.text}')
 
         r_serv_metadata.set('hive_cases:'+path, id)
 
         return hive_case_url.replace('id_here', id)
     else:
-        print('ko: {}/{}'.format(response.status_code, response.text))
+        logger.info(f'ko: {response.status_code}/{response.text}')
         return False
 
 # ============= ROUTES ==============
@@ -232,14 +255,17 @@ def PasteSubmit_page():
 @PasteSubmit.route("/PasteSubmit/submit", methods=['POST'])
 @login_required
 @login_analyst
+@limit_content_length()
 def submit():
 
     #paste_name = request.form['paste_name']
+    logger.debug('submit')
 
     password = request.form['password']
     ltags = request.form['tags_taxonomies']
     ltagsgalaxies = request.form['tags_galaxies']
     paste_content = request.form['paste_content']
+    paste_source = request.form['paste_source']
 
     is_file = False
     if 'file' in request.files:
@@ -247,6 +273,8 @@ def submit():
         if file:
             if file.filename:
                 is_file = True
+
+    logger.debug(f'is file ? {is_file}')
 
     submitted_tag = 'infoleak:submission="manual"'
 
@@ -256,13 +284,13 @@ def submit():
     active_galaxies = Tag.get_active_galaxies()
 
     if ltags or ltagsgalaxies:
-
+        logger.debug(f'ltags ? {ltags} {ltagsgalaxies}')
         ltags = Tag.unpack_str_tags_list(ltags)
         ltagsgalaxies = Tag.unpack_str_tags_list(ltagsgalaxies)
 
         if not Tag.is_valid_tags_taxonomies_galaxy(ltags, ltagsgalaxies):
             content = 'INVALID TAGS'
-            print(content)
+            logger.info(content)
             return content, 400
 
     # add submitted tags
@@ -271,55 +299,36 @@ def submit():
     ltags.append(submitted_tag)
 
     if is_file:
-        if file:
+        logger.debug(f'entering file management')
+        if allowed_file(file.filename):
 
-            if file and allowed_file(file.filename):
-
-                # get UUID
-                UUID = str(uuid.uuid4())
-
-                '''if paste_name:
-                    # clean file name
-                    UUID = clean_filename(paste_name)'''
-
-                # create submitted dir
-                if not os.path.exists(UPLOAD_FOLDER):
-                    os.makedirs(UPLOAD_FOLDER)
-
-                if not '.' in file.filename:
-                    full_path = os.path.join(UPLOAD_FOLDER, UUID)
-                else:
-                    if file.filename[-6:] == 'tar.gz':
-                        file_type = 'tar.gz'
-                    else:
-                        file_type = file.filename.rsplit('.', 1)[1]
-                    name = UUID + '.' + file_type
-                    full_path = os.path.join(UPLOAD_FOLDER, name)
-
-                #Flask verify the file size
-                file.save(full_path)
-
-                paste_content = full_path
-
-                Import_helper.create_import_queue(ltags, ltagsgalaxies, paste_content, UUID, password ,True)
-
-                return render_template("submit_items.html",
-                                            active_taxonomies = active_taxonomies,
-                                            active_galaxies = active_galaxies,
-                                            UUID = UUID)
-
-            else:
-                content = 'wrong file type, allowed_extensions: sh, pdf, zip, gz, tar.gz or remove the extension'
-                print(content)
-                return content, 400
-
-
-    elif paste_content != '':
-        if sys.getsizeof(paste_content) < 900000:
-
-            # get id
+            # get UUID
             UUID = str(uuid.uuid4())
-            Import_helper.create_import_queue(ltags, ltagsgalaxies, paste_content, UUID, password)
+
+            '''if paste_name:
+                # clean file name
+                UUID = clean_filename(paste_name)'''
+
+            # create submitted dir
+            if not os.path.exists(UPLOAD_FOLDER):
+                os.makedirs(UPLOAD_FOLDER)
+
+            if not '.' in file.filename:
+                full_path = os.path.join(UPLOAD_FOLDER, UUID)
+            else:
+                if file.filename[-6:] == 'tar.gz':
+                    file_type = 'tar.gz'
+                else:
+                    file_type = file.filename.rsplit('.', 1)[1]
+                name = UUID + '.' + file_type
+                full_path = os.path.join(UPLOAD_FOLDER, name)
+
+            #Flask verify the file size
+            file.save(full_path)
+
+            paste_content = full_path
+
+            Import_helper.create_import_queue(ltags, ltagsgalaxies, paste_content, UUID, password ,True)
 
             return render_template("submit_items.html",
                                         active_taxonomies = active_taxonomies,
@@ -327,12 +336,32 @@ def submit():
                                         UUID = UUID)
 
         else:
-            content = 'size error'
-            print(content)
+            content = f'wrong file type, allowed_extensions: {Flask_config.SUBMIT_PASTE_FILE_ALLOWED_EXTENSIONS} or remove the extension'
+            logger.info(content)
+            return content, 400
+
+
+    elif paste_content != '':
+        logger.debug(f'entering text paste management')
+        if sys.getsizeof(paste_content) < Flask_config.SUBMIT_PASTE_TEXT_MAX_SIZE:
+            logger.debug(f'size {sys.getsizeof(paste_content)}')
+            # get id
+            UUID = str(uuid.uuid4())
+            logger.debug('create import')
+            Import_helper.create_import_queue(ltags, ltagsgalaxies, paste_content, UUID, password, source=paste_source)
+            logger.debug('import OK')
+            return render_template("submit_items.html",
+                                        active_taxonomies = active_taxonomies,
+                                        active_galaxies = active_galaxies,
+                                        UUID = UUID)
+
+        else:
+            content = f'text paste size is over {Flask_config.SUBMIT_PASTE_TEXT_MAX_SIZE} bytes limit'
+            logger.info(content)
             return content, 400
 
         content = 'submit aborded'
-        print(content)
+        logger.error(content)
         return content, 400
 
 
