@@ -66,3 +66,6 @@ doc/all_modules.txt
 doc/module-data-flow.png
 doc/data-flow.png
 doc/statistics
+
+# editor
+settings.json
