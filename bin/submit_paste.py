@@ -179,6 +179,7 @@ class SubmitPaste(AbstractModule):
                         else:
                         # Compressed file
                             self.abord_file_submission(uuid, "file decompression should be implemented")
+                            # TODO add compress file management
                             # #decompress file
                             # try:
                             #     if password == None:
