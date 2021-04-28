@@ -52,7 +52,7 @@ class SubmitPaste(AbstractModule):
         """
         init
         """
-        super(SubmitPaste, self).__init__(queue_name='submit_paste', logger_channel='script:submitpaste')
+        super(SubmitPaste, self).__init__(queue_name='submit_paste')
 
         self.r_serv_db = ConfigLoader.ConfigLoader().get_redis_conn("ARDB_DB")
         self.r_serv_log_submit = ConfigLoader.ConfigLoader().get_redis_conn("Redis_Log_submit")
@@ -118,7 +118,7 @@ class SubmitPaste(AbstractModule):
                 try:
                     uuid = self.r_serv_db.srandmember('submitted:uuid')
                     # Module processing with the message from the queue
-                    print(uuid)
+                    self.redis_logger.debug(uuid)
                     self.compute(uuid)
                 except Exception as err:
                     self.redis_logger.error(f'Error in module {self.module_name}: {err}')
@@ -146,15 +146,24 @@ class SubmitPaste(AbstractModule):
         """
         Create a paste for given file
         """
-        if os.path.exists(file_full_path):
+        self.redis_logger.debug('manage')
 
+        if os.path.exists(file_full_path):
+            self.redis_logger.debug(f'file exists {file_full_path}')
+            
+            file_size = os.stat(file_full_path).st_size
+            self.redis_logger.debug(f'file size {file_size}')
             # Verify file length
-            if os.stat(file_full_path).st_size < SubmitPaste.FILE_MAX_SIZE:
+            if file_size < SubmitPaste.FILE_MAX_SIZE:
                 # TODO sanitize filename
                 filename = file_full_path.split('/')[-1]
+                self.redis_logger.debug(f'sanitize filename {filename}')
+                self.redis_logger.debug('file size allowed')
+
                 if not '.' in filename:
-                    # read file
+                    self.redis_logger.debug('no extension for filename')
                     try:
+                        # Read file
                         with open(file_full_path,'r') as f:
                             content = f.read()
                             self.r_serv_log_submit.set(uuid + ':nb_total', 1)
@@ -166,11 +175,14 @@ class SubmitPaste(AbstractModule):
                 else:
                     file_type = filename.rsplit('.', 1)[1]
                     file_type = file_type.lower()
+                    self.redis_logger.debug(f'file ext {file_type}')
 
                     if file_type in SubmitPaste.ALLOWED_EXTENSIONS:
+                        self.redis_logger.debug('Extension allowed')
                         # TODO enum of possible file extension ?
                         # TODO verify file hash with virus total ?
-                        if not _is_compressed_type(file_type):
+                        if not self._is_compressed_type(file_type):
+                            self.redis_logger.debug('Plain text file')
                             # plain txt file
                             with open(file_full_path,'r') as f:
                                 content = f.read()
@@ -252,6 +264,8 @@ class SubmitPaste(AbstractModule):
 
 
     def create_paste(self, uuid, paste_content, ltags, ltagsgalaxies, name, source=None):
+        
+        result = False
 
         now = datetime.datetime.now()
         source = source if source else 'submitted'
@@ -260,58 +274,77 @@ class SubmitPaste(AbstractModule):
         full_path = filename = os.path.join(os.environ['AIL_HOME'],
                                 self.process.config.get("Directories", "pastes"), save_path)
 
-        if os.path.isfile(full_path):
+        self.redis_logger.debug(f'file path of the paste {full_path}')
+
+        if not os.path.isfile(full_path):
+            # file not exists in AIL paste directory
+            self.redis_logger.debug(f"new paste {paste_content}")
+
+            gzip64encoded = self._compress_encode_content(paste_content)
+
+            if gzip64encoded:
+
+                # use relative path
+                rel_item_path = save_path.replace(self.PASTES_FOLDER, '', 1)
+                self.redis_logger.debug(f"relative path {rel_item_path}")
+
+                # send paste to Global module
+                relay_message = f"{rel_item_path} {gzip64encoded}"
+                self.process.populate_set_out(relay_message, 'Mixer')
+
+                # increase nb of paste by feeder name
+                self.r_serv_log_submit.hincrby("mixer_cache:list_feeder", source, 1)
+
+                # add tags
+                for tag in ltags:
+                    Tag.add_tag('item', tag, rel_item_path)
+
+                for tag in ltagsgalaxies:
+                    Tag.add_tag('item', tag, rel_item_path)
+
+                self.r_serv_log_submit.incr(f'{uuid}:nb_end')
+                self.r_serv_log_submit.incr(f'{uuid}:nb_sucess')
+
+                if self.r_serv_log_submit.get(f'{uuid}:nb_end') == self.r_serv_log_submit.get(f'{uuid}:nb_total'):
+                    self.r_serv_log_submit.set(f'{uuid}:end', 1)
+
+                self.redis_logger.debug(f'    {rel_item_path} send to Global')
+                self.r_serv_log_submit.sadd(f'{uuid}:paste_submit_link', rel_item_path)
+
+                curr_date = datetime.date.today()
+                self.serv_statistics.hincrby(curr_date.strftime("%Y%m%d"),'submit_paste', 1)
+                self.redis_logger.debug("paste submitted")
+        else:
             self.addError(uuid, f'File: {save_path} already exist in submitted pastes')
-            return 1
+
+        return result
+
+
+    def _compress_encode_content(self, content):
+        gzip64encoded = None
 
         try:
-            gzipencoded = gzip.compress(paste_content)
+            gzipencoded = gzip.compress(content)
             gzip64encoded = base64.standard_b64encode(gzipencoded).decode()
         except:
-            self.aabord_file_submission(uuid, "file error")
-            return 1
-
-        # use relative path
-        rel_item_path = save_path.replace(self.PASTES_FOLDER, '', 1)
-
-        # send paste to Global module
-        relay_message = f"{rel_item_path} {gzip64encoded}"
-        self.process.populate_set_out(relay_message, 'Mixer')
-
-        # increase nb of paste by feeder name
-        self.r_serv_log_submit.hincrby("mixer_cache:list_feeder", source, 1)
-
-        # add tags
-        for tag in ltags:
-            Tag.add_tag('item', tag, rel_item_path)
-
-        for tag in ltagsgalaxies:
-            Tag.add_tag('item', tag, rel_item_path)
-
-        self.r_serv_log_submit.incr(f'{uuid}:nb_end')
-        self.r_serv_log_submit.incr(f'{uuid}:nb_sucess')
-
-        if self.r_serv_log_submit.get(f'{uuid}:nb_end') == self.r_serv_log_submit.get(f'{uuid}:nb_total'):
-            self.r_serv_log_submit.set(f'{uuid}:end', 1)
-
-        self.redis_logger.debug(f'    {rel_item_path} send to Global')
-        self.r_serv_log_submit.sadd(f'{uuid}:paste_submit_link', rel_item_path)
-
-        curr_date = datetime.date.today()
-        self.serv_statistics.hincrby(curr_date.strftime("%Y%m%d"),'submit_paste', 1)
-
-        return 0
+            self.abord_file_submission(uuid, "file error")
+        
+        return gzip64encoded
 
 
     def addError(self, uuid, errorMessage):
-        print(errorMessage)
+        self.redis_logger.debug(errorMessage)
+
         error = self.r_serv_log_submit.get(f'{uuid}:error')
         if error != None:
             self.r_serv_log_submit.set(f'{uuid}:error', error + '<br></br>' + errorMessage)
+
         self.r_serv_log_submit.incr(f'{uuid}:nb_end')
 
 
     def abord_file_submission(self, uuid, errorMessage):
+        self.redis_logger.debug(f'abord {uuid}, {errorMessage}')
+
         self.addError(uuid, errorMessage)
         self.r_serv_log_submit.set(f'{uuid}:end', 1)
         curr_date = datetime.date.today()
@@ -323,6 +356,11 @@ class SubmitPaste(AbstractModule):
         l_directory = item_filename.split('/')
         return f'{l_directory[-4]}{l_directory[-3]}{l_directory[-2]}'
 
+    def verify_extention_filename(self, filename):
+        if not '.' in filename:
+            return True
+        else:
+            file_type = filename.rsplit('.', 1)[1]
 
     def verify_extention_filename(self, filename):
         if not '.' in filename:

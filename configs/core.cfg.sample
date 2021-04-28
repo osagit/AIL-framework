@@ -291,9 +291,9 @@ comboleakfile = files/combo_leak.yaml
 default_pubkey = configs/keys/comboleak_public.pem
 
 [SubmitPaste]
-# 8 Mb Max text paste size for text submission
+# 1 Mb Max text paste size for text submission
 TEXT_MAX_SIZE = 1000000
-# 8 Gb Max file size for file submission
+# 1 Gb Max file size for file submission
 FILE_MAX_SIZE = 1000000000
 # Managed file extenions for file submission, comma separated
 # TODO add 'zip', 'gz' and 'tar.gz'

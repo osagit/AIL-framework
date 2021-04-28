@@ -73,6 +73,10 @@ UPLOAD_FOLDER = Flask_config.UPLOAD_FOLDER
 misp_event_url = Flask_config.misp_event_url
 hive_case_url = Flask_config.hive_case_url
 
+text_max_size = int(Flask_config.SUBMIT_PASTE_TEXT_MAX_SIZE) / (1000*1000)
+file_max_size = int(Flask_config.SUBMIT_PASTE_FILE_MAX_SIZE) / (1000*1000*1000)
+allowed_extensions = ", ". join(Flask_config.SUBMIT_PASTE_FILE_ALLOWED_EXTENSIONS)
+
 
 # ============ Validators ============
 def limit_content_length():
@@ -98,7 +102,10 @@ def allowed_file(filename):
     if not '.' in filename:
         return True
     else:
-        return filename.rsplit('.', 1)[1].lower() in Flask_config.SUBMIT_PASTE_FILE_ALLOWED_EXTENSIONS
+        file_ext = filename.rsplit('.', 1)[1].lower()
+        logger.debug(file_ext)
+        logger.debug(Flask_config.SUBMIT_PASTE_FILE_ALLOWED_EXTENSIONS)
+        return file_ext in Flask_config.SUBMIT_PASTE_FILE_ALLOWED_EXTENSIONS
 
 def clean_filename(filename, whitelist=valid_filename_chars, replace=' '):
     # replace characters
@@ -250,7 +257,10 @@ def PasteSubmit_page():
 
     return render_template("submit_items.html",
                             active_taxonomies = active_taxonomies,
-                            active_galaxies = active_galaxies)
+                            active_galaxies = active_galaxies, 
+                            text_max_size = text_max_size,
+                            file_max_size = file_max_size,
+                            allowed_extensions = allowed_extensions)
 
 @PasteSubmit.route("/PasteSubmit/submit", methods=['POST'])
 @login_required
@@ -269,9 +279,9 @@ def submit():
 
     is_file = False
     if 'file' in request.files:
-        file = request.files['file']
-        if file:
-            if file.filename:
+        file_import = request.files['file']
+        if file_import:
+            if file_import.filename:
                 is_file = True
 
     logger.debug(f'is file ? {is_file}')
@@ -299,8 +309,10 @@ def submit():
     ltags.append(submitted_tag)
 
     if is_file:
-        logger.debug(f'entering file management')
-        if allowed_file(file.filename):
+        logger.debug('file management')
+
+        if allowed_file(file_import.filename):
+            logger.debug('file extension allowed')
 
             # get UUID
             UUID = str(uuid.uuid4())
@@ -311,24 +323,28 @@ def submit():
 
             # create submitted dir
             if not os.path.exists(UPLOAD_FOLDER):
+                logger.debug('create folder')
                 os.makedirs(UPLOAD_FOLDER)
 
-            if not '.' in file.filename:
+            if not '.' in file_import.filename:
+                logger.debug('add UUID to path')
                 full_path = os.path.join(UPLOAD_FOLDER, UUID)
             else:
-                if file.filename[-6:] == 'tar.gz':
+                if file_import.filename[-6:] == 'tar.gz':
+                    logger.debug('file extension is tar.gz')
                     file_type = 'tar.gz'
                 else:
-                    file_type = file.filename.rsplit('.', 1)[1]
+                    file_type = file_import.filename.rsplit('.', 1)[1]
+                    logger.debug(f'file type {file_type}')
                 name = UUID + '.' + file_type
                 full_path = os.path.join(UPLOAD_FOLDER, name)
+                logger.debug(f'full path {full_path}')
 
             #Flask verify the file size
-            file.save(full_path)
-
-            paste_content = full_path
-
-            Import_helper.create_import_queue(ltags, ltagsgalaxies, paste_content, UUID, password ,True)
+            file_import.save(full_path)
+            logger.debug('file saved')
+            
+            Import_helper.create_import_queue(ltags, ltagsgalaxies, full_path, UUID, password, True)
 
             return render_template("submit_items.html",
                                         active_taxonomies = active_taxonomies,
@@ -336,7 +352,7 @@ def submit():
                                         UUID = UUID)
 
         else:
-            content = f'wrong file type, allowed_extensions: {Flask_config.SUBMIT_PASTE_FILE_ALLOWED_EXTENSIONS} or remove the extension'
+            content = f'wrong file type, allowed_extensions: {allowed_extensions} or remove the extension'
             logger.info(content)
             return content, 400
 

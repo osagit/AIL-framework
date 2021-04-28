@@ -99,46 +99,39 @@
 
 			<div class="col-12 col-lg-10" id="core_content">
 
+				{% if message %}
+				<p>{{ message }}</p>
+				{% endif %}
+
 				<form action="{{ url_for('PasteSubmit.submit') }}" id="pasteSubmitForm" method="post"
 					enctype=multipart/form-data onsubmit="submitPaste()">
 
 					<input type="hidden" id="tags_taxonomies" name="tags_taxonomies" value="test">
 					<input type="hidden" id="tags_galaxies" name="tags_galaxies" value="test">
 
-					<div class="row">
-						<div class="col-xl-5">
 
-							<div class="card mt-2 mb-4">
-								<div
-									class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-									<h6 class="m-0 font-weight-bold text-primary">Files submission</h6>
+					<div class="card mt-2 mb-4">
+						<div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+							<h6 class="m-0 font-weight-bold text-primary">Submit Paste</h6>
+						</div>
+						<div class="card-body">
+
+							<div class="row mb-3">
+								<div class="form-check form-check-inline">
+									<input class="form-check-input" type="radio" id="radioimportfile" name="radioimport"
+										value="file" checked />
+									<label class="form-check-label" for="radioimportfile"> Submit a file </label>
 								</div>
-								<div class="card-body">
-
-									<div class="form-group">
-										<label for="file">Submit a file</label>
-										<input type="file" class="form-control-file" id="file" name="file">
-									</div>
-
-									<div class="form-group">
-										<label for="paste_name">Archive Password</label>
-										<input type="password" class="form-control" id="password" name="password"
-											placeholder="Optional">
-									</div>
+								<div class="form-check form-check-inline">
+									<input class="form-check-input" type="radio" type="radio" id="radioimporttext"
+										name="radioimport" value="text" />
+									<label class="form-check-label" for="radioimporttext"> Submit a text </label>
 								</div>
 							</div>
 
-						</div>
-
-						<div class="col-xl-7">
-
-							<div class="card mt-2 mb-4">
-								<div
-									class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-									<h6 class="m-0 font-weight-bold text-primary">Tags</h6>
-								</div>
-								<div class="card-body">
-
+							<label for="ltagsgalaxies">Optional Tags:</label>
+							<div class="row mb-3">
+								<div class="col">
 									<div class="input-group">
 										<input id="ltags" type="text" class="form-control" autocomplete="off">
 									</div>
@@ -162,13 +155,13 @@
 											{% endfor %}
 										</div>
 									</div>
-
+								</div>
+								<div class="col">
 									<div class="input-group">
 										<input id="ltagsgalaxies" type="text" class="form-control" autocomplete="off">
 									</div>
-
 									<div class="dropdown">
-										<button type="button" class="btn btn-info dropdown-toggle mt-1"
+										<button type="button" class="btn btn-info dropdown-toggle mt-1 mb-3"
 											data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
 											id="dropdown-galaxy">
 											Galaxy Selected
@@ -186,35 +179,49 @@
 											{% endfor %}
 										</div>
 									</div>
-
 								</div>
 							</div>
-
 						</div>
-					</div>
 
-					<div class="card mb-4">
-						<!-- Card Header - Dropdown -->
-						<div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-							<h6 class="m-0 font-weight-bold text-primary">Text submission</h6>
-						</div>
-						<!-- Card Body -->
-						<div class="card-body">
-							<div class="form-group mt-3">
-								<input id="paste_source" type="text" name="paste_source"
-									class="form-control bg-light border-0 small" placeholder="Source"
-									aria-label="Source" aria-describedby="basic-addon2">
-							</div>
-							<div class="form-group mt-3">
-								<textarea class="form-control" id="paste_content" name="paste_content"
-									rows="25"></textarea>
+
+						<!-- Card Import File -->
+						<div class="input-group mt-2 mb-2" id="cardimportfile">
+							<div class="card-body">
+								<div class="form-group">
+									<label for="file">Submit a file, format allowed: {{allowed_extensions}}, max size
+										{{file_max_size}} Gb</label>
+									<input type="file" class="form-control-file" id="file" name="file">
+								</div>
+								<!-- TODO reactivate while zipped format are enabled -->
+								<div class="form-group d-none">
+									<label for="paste_name">Archive Password</label>
+									<input type="password" class="form-control" id="password" name="password"
+										placeholder="Optional">
+								</div>
 							</div>
 						</div>
-					</div>
 
+						<!-- Card Import Text -->
+						<div class="input-group mb-4 mb-2" id="cardimporttext">
+							<div class="card-body">
+								<div class="form-group">
+									<label for="paste_source">Submit a text, max size {{text_max_size}} Mb</label>
+									<input id="paste_source" type="text" name="paste_source"
+										class="form-control bg-light border-0 small" placeholder="Source"
+										aria-label="Source" aria-describedby="basic-addon2">
+								</div>
+								<div class="form-group mt-3">
+									<textarea class="form-control" id="paste_content" name="paste_content"
+										rows="20"></textarea>
+								</div>
+							</div>
+						</div>
 
-					<div class="form-group">
-						<button class="btn btn-primary " name="submit" type="submit">Submit Item</button>
+						<div class="form-group">
+							<button class="btn btn-primary btn-lg btn-block" name="submit" type="submit">Submit
+								Item</button>
+						</div>
+
 					</div>
 
 				</form>
@@ -226,6 +233,21 @@
 
 
 </body>
+
+<!-- Toggle import div related to radio button selected -->
+<script>
+	$(document).ready(function () {
+		$("#cardimporttext").hide();
+
+		$('input[type="radio"]').click(function () {
+			var inputValue = $(this).attr("value");
+			$("#cardimportfile").hide();
+			$("#cardimporttext").hide();
+			var targetBox = $("#cardimport" + inputValue);
+			$(targetBox).show();
+		});
+	});
+</script>
 
 <script>
 	var ltags
@@ -393,9 +415,6 @@
 	}
 	makeProgress();
 </script>
-
-
-
 
 
 </html>
