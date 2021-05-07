@@ -69,3 +69,4 @@ doc/statistics
 
 # editor
 settings.json
+.vscode/**/*

@@ -92,3 +92,5 @@ matplotlib
 pycrypto
 pyyaml
 beautifulsoup4
+gevent
+redisearch

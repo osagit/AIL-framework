@@ -176,6 +176,7 @@ class SubmitPaste(AbstractModule):
                     file_type = filename.rsplit('.', 1)[1]
                     file_type = file_type.lower()
                     self.redis_logger.debug(f'file ext {file_type}')
+                    self.redis_logger.debug(f'exte {SubmitPaste.ALLOWED_EXTENSIONS}')
 
                     if file_type in SubmitPaste.ALLOWED_EXTENSIONS:
                         self.redis_logger.debug('Extension allowed')
@@ -225,7 +226,8 @@ class SubmitPaste(AbstractModule):
                             # except FileNotFoundError:
                             #     self.redis_logger.error("Error in module %s: file not found"%(self.module_name))
                             #     self.addError(uuid, 'File not found: {}'.format(file_full_path), uuid )
-
+                    else:
+                        self.redis_logger.debug('Extension NOT allowed')
             else:
                 self.abord_file_submission(uuid, f'File :{file_full_path} too large, over {SubmitPaste.FILE_MAX_SIZE} bytes')
         else:

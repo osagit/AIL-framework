@@ -45,11 +45,6 @@ class WebStats(AbstractModule):
     def __init__(self):
         super(WebStats, self).__init__()
 
-        # Send module state to logs
-        self.redis_logger.info("Module %s initialized"%(self.module_name))
-        # Sent to the logging a description of the module
-        self.redis_logger.info("Makes statistics about valid URL")
-
         self.pending_seconds = 5*60
 
         # REDIS #
@@ -75,6 +70,11 @@ class WebStats(AbstractModule):
 
         self.faup = Faup()
         self.generate_new_graph = False
+
+        # Send module state to logs
+        self.redis_logger.info("Module %s initialized"%(self.module_name))
+        # Sent to the logging a description of the module
+        self.redis_logger.info("Makes statistics about valid URL")
 
 
     def computeNone(self):

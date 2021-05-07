@@ -18,6 +18,7 @@ import zmq
 import time
 import datetime
 import json
+from lib.ConfigLoader import ConfigLoader
 
 
 class PubSub(object): ## TODO: remove config, use ConfigLoader by default
@@ -42,11 +43,7 @@ class PubSub(object): ## TODO: remove config, use ConfigLoader by default
             channel = conn_name.split('_')[1]
         if conn_name.startswith('Redis'):
             self.redis_sub = True
-            r = redis.StrictRedis(
-                host=self.config.get('RedisPubSub', 'host'),
-                port=self.config.get('RedisPubSub', 'port'),
-                db=self.config.get('RedisPubSub', 'db'),
-                decode_responses=True)
+            r = ConfigLoader.ConfigLoader().get_redis_conn('RedisPubSub')
             self.subscribers = r.pubsub(ignore_subscribe_messages=True)
             self.subscribers.psubscribe(channel)
         elif conn_name.startswith('ZMQ'):
@@ -68,10 +65,7 @@ class PubSub(object): ## TODO: remove config, use ConfigLoader by default
         else:
             channel = conn_name.split('_')[1]
         if conn_name.startswith('Redis'):
-            r = redis.StrictRedis(host=self.config.get('RedisPubSub', 'host'),
-                                  port=self.config.get('RedisPubSub', 'port'),
-                                  db=self.config.get('RedisPubSub', 'db'),
-                                  decode_responses=True)
+            r = ConfigLoader.ConfigLoader().get_redis_conn('RedisPubSub')
             self.publishers['Redis'].append((r, channel))
         elif conn_name.startswith('ZMQ'):
             context = zmq.Context()
@@ -134,17 +128,11 @@ class Process(object):
                 self.pubsub = PubSub()
             else:
                 raise Exception('Your process has to listen to at least one feed.')
-            self.r_temp = redis.StrictRedis(
-                host=self.config.get('RedisPubSub', 'host'),
-                port=self.config.get('RedisPubSub', 'port'),
-                db=self.config.get('RedisPubSub', 'db'),
-                decode_responses=True)
+            
+            config_loader = ConfigLoader()
+            self.r_temp = config_loader.get_redis_conn('RedisPubSub')
 
-            self.serv_statistics = redis.StrictRedis(
-                host=self.config.get('ARDB_Statistics', 'host'),
-                port=self.config.get('ARDB_Statistics', 'port'),
-                db=self.config.get('ARDB_Statistics', 'db'),
-                decode_responses=True)
+            self.serv_statistics = config_loader.get_redis_conn('ARDB_Statistics')
 
             self.moduleNum = os.getpid()
 

@@ -1,0 +1,255 @@
+{# gafa/templates/index.html #}
+
+{% extends 'base.html' %}
+
+{% block title %}{{ company_name }}{% endblock %}
+
+{% block content %}
+
+<!-- Page Heading -->
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-100">{{ company_name }}</h1>
+    <a href="#" class="d-none d-sm-inline-block btn btn-sm btn-secondary shadow-sm"><i
+            class="fas fa-download fa-sm text-white-50"></i> Generate Report</a>
+</div>
+
+<!-- Content Row -->
+<div class="row">
+    <!-- Pending Requests Card Example -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Pastes Analyzed Today <span id="daily_pastes_date" style="color: var(--gray-dark);">
+                                date</span></div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="daily_pastes_value">0</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-cog fa-2x fa-pulse text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gafa Mail found (Total) -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            {{ company_name }} found (Total)</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_credential_found }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gafa Mail found (Today) -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            {{ company_name }} found Today (uniq)</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ daily_leak_unicity }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checked valid password -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Valid credentials
+                            (TODO)
+                        </div>
+                        <div class="row no-gutters align-items-center">
+                            <div class="col-auto">
+                                <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">0%</div>
+                            </div>
+                            <div class="col">
+                                <div class="progress progress-sm mr-2">
+                                    <div class="progress-bar bg-info" role="progressbar" style="width: 1%"
+                                        aria-valuenow="1" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Content Row -->
+
+<div class="row">
+
+    <!-- Area Chart -->
+    <div class="col-xl-4 col-lg-4">
+        <div class="card shadow mb-4">
+            <!-- Card Header - Dropdown -->
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">{{ company_name }} Leak Trends</h6>
+                <div class="dropdown no-arrow">
+                    <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
+                        aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                        aria-labelledby="dropdownMenuLink">
+                        <div class="dropdown-header">Period:</div>
+                        <a class="dropdown-item" href="#" id="leak_trends_7d">Last 7 days</a>
+                        <a class="dropdown-item" href="#" id="leak_trends_15d">Last 15 days</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="#" id="leak_trends_1m">Last month</a>
+                    </div>
+                </div>
+            </div>
+            <!-- Card Body -->
+            <div class="card-body">
+                <div class="chart-area">
+                    <canvas id="leak-trends-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pie Chart Domains -->
+    <div class="col-xl-4 col-lg-4">
+        <div class="card shadow mb-4">
+            <!-- Card Header - Dropdown -->
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Domains</h6>
+            </div>
+            <!-- Card Body -->
+            <div class="card-body">
+                <div class="chart-pie pt-4 pb-2">
+                    <canvas id="domainPieChart"></canvas>
+                </div>
+                <div class="mt-4 text-center small">
+                    {% for lbl in domain_labels_colors %}
+                    <span class="mr-2">
+                        <i class="fas fa-circle" style="color: {{ lbl.color }}"></i>&nbsp;{{ lbl.name }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pie Chart Sources -->
+    <div class="col-xl-4 col-lg-4">
+        <div class="card shadow mb-4">
+            <!-- Card Header - Dropdown -->
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Sources</h6>
+            </div>
+            <!-- Card Body -->
+            <div class="card-body">
+                <div class="chart-pie pt-4 pb-2">
+                    <canvas id="sourcePieChart"></canvas>
+                </div>
+                <div class="mt-4 text-center small">
+                    {% for lbl in source_labels_colors %}
+                    <span class="mr-2">
+                        <i class="fas fa-circle" style="color: {{ lbl.color }}"></i>&nbsp;{{ lbl.name }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Content Row -->
+<div class="row">
+
+    <div class="col-lg-12 mb-4">
+
+        <!-- Gafa Credentials Analytics -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <img class="img-fluid px-3 px-sm-4 mt-3 mb-4" style="width: 12rem;"
+                        src="{{ url_for('static', filename='orange/img/undraw_Data_re_80ws.svg') }}" alt="chart image">
+                    {{ company_name }} Logs
+                </h6>
+            </div>
+            <div class="card-body">
+                <div>
+                    <table id="logtable" class="display" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">Level</th>
+                                <th style="width: 80px;">Type</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- Core plugin JavaScript-->
+<script src="{{ url_for('static', filename='sb-admin-2/vendor/jquery-easing/jquery.easing.min.js') }}"></script>
+
+<!-- Page level plugins -->
+<script src="{{ url_for('static', filename='sb-admin-2/vendor/chart.js/Chart.min.js') }}"></script>
+
+<!-- Domains origin -->
+<meta id="domain_pie_data" data-domain_pie_credentials="{{ domain_pie_json }}">
+<!-- Sources origin -->
+<meta id="source_pie_data" data-source_pie_credentials="{{ source_pie_json }}">
+<!-- Company name -->
+<meta id="company_name" data-company_name="{{ company_name }}">
+
+<!-- Leak Trends Chart data -->
+<meta id="leak_trends_chart_data" data-leak_trends_chart_data="{{ chart_data }}">
+
+<!-- Page level custom scripts -->
+<script src="{{ url_for('static', filename='comboleak/js/daily-data.js') }}"></script>
+<script src="{{ url_for('static', filename='comboleak/js/daily-logs.js') }}"></script>
+<script src="{{ url_for('static', filename='comboleak/js/chart-line-trends.js') }}"></script>
+<script src="{{ url_for('static', filename='comboleak/js/chart-pie-mail.js') }}"></script>
+
+<script type="text/javascript">
+    $(".nav-item").removeClass("active");
+    $("#page-Credentials").addClass("active");
+    $("#collapseCredentials").addClass("show");
+</script>
+
+{% endblock %}

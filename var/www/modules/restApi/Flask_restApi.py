@@ -12,6 +12,7 @@ import uuid
 import json
 import redis
 import datetime
+import time
 
 sys.path.append(os.path.join(os.environ['AIL_BIN'], 'lib/'))
 import Domain
@@ -33,16 +34,26 @@ from flask_login import login_required
 
 from functools import wraps
 
+##################################
+# Import External packages
+##################################
+from redis import ResponseError
+from redisearch import Client
+from redisearch.aggregation import AggregateRequest, Asc
+
 # ============ VARIABLES ============
 import Flask_config
 
 
 app = Flask_config.app
+
+# Init conf objects
 baseUrl = Flask_config.baseUrl
 r_cache = Flask_config.r_cache
 r_serv_db = Flask_config.r_serv_db
 r_serv_onion = Flask_config.r_serv_onion
 r_serv_metadata = Flask_config.r_serv_metadata
+redis_search_orange = Flask_config.redis_search_orange
 
 
 restApi = Blueprint('restApi', __name__, template_folder='templates')
@@ -616,6 +627,73 @@ def import_json_item():
 @token_required('read_only')
 def v1_ping():
     return Response(json.dumps({'status': 'pong'}), mimetype='application/json'), 200
+
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# GET
+#
+# {
+#   "id": item_id,      mandatory
+# }
+#
+# response: {
+#               "id": "item_id",
+#               "tags": [],
+#           }
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+@restApi.route("api/v1/comboleak", methods=['GET'])
+@token_required('read_only')
+def get_comboleaks():
+    company = request.args.get('company')
+    print(company)
+    since = request.args.get('since')
+    print(since)
+
+    result = 'pong'
+    # now = int(time.time())
+    now = datetime.datetime.strptime('2021-01-04T16:41:24+0200', "%Y-%m-%dT%H:%M:%S%z")
+    now = date_timestamp = datetime.datetime.fromisoformat(since).timestamp()
+    print(now)
+
+
+    # with redis_search_orange as r:
+
+    client = Client('record-idx', port=6383)
+    try:
+        info = client.info()
+        for k in [  'index_name', 'index_options', 'fields', 'num_docs',
+                    'max_doc_id', 'num_terms', 'num_records', 'inverted_sz_mb',
+                    'offset_vectors_sz_mb', 'doc_table_size_mb', 'key_table_size_mb',
+                    'records_per_doc_avg', 'bytes_per_record_avg', 'offsets_per_term_avg',
+                    'offset_bits_per_record_avg' ]:
+            print(info[k])
+        
+        # FT.AGGREGATE record-idx 
+        # "@first_seen:[00010 +inf]" 
+        # APPLY timefmt(@first_seen) AS recorded_date 
+        # GROUPBY 1 @recorded_date
+        # REDUCE COUNT 0 AS num_recorded
+        # SORTBY 2 @recorded_date ASC
+        # req = AggregateRequest(f'@first_seen:[{now} +inf]').group_by(
+        #     ['@published_year'], reducers.avg('average_rating').alias('average_rating_for_year')
+        # ).sort_by(
+        #     Asc('@average_rating_for_year')
+        # ).filter('@average_rating_for_year > 3')
+        result = client.search(f'@first_seen:[{now} +inf]')
+        print(result)
+    except ResponseError as err:
+        # Index does not exist. We need to create it!
+        result = err
+
+    return Response(json.dumps({'status': f'{result}'}), mimetype='application/json'), 200
+    # data = request.get_json()
+    # item_id = data.get('id', None)
+    # req_data = {'id': item_id, 'date': False, 'tags': True}
+    # res = Item.get_item(req_data)
+    # return Response(json.dumps(res[0], indent=2, sort_keys=True), mimetype='application/json'), res[1]
+
 
 # ========= REGISTRATION =========
 app.register_blueprint(restApi, url_prefix=baseUrl)

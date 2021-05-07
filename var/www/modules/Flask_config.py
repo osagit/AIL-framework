@@ -39,6 +39,8 @@ r_serv_db = config_loader.get_redis_conn("ARDB_DB")
 r_serv_statistics = config_loader.get_redis_conn("ARDB_Statistics")
 r_serv_onion = config_loader.get_redis_conn("ARDB_Onion")
 
+redis_ardb_orange = config_loader.get_redis_conn("ARDB_Orange")
+redis_search_orange = config_loader.get_redis_conn("Redis_Search_Orange")
 
 # Logger (Redis)
 redis_logger = publisher

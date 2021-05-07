@@ -109,20 +109,17 @@ class Categ(AbstractModule):
             lenfound = len(found)
             if lenfound >= self.matchingThreshold:
                 is_categ_found = True
-                msg = '{} {}'.format(paste.p_rel_path, lenfound)
+                msg = f'{paste.p_rel_path} {lenfound}'
 
-                self.redis_logger.debug('%s;%s %s'%(self.module_name, msg, categ))
+                self.redis_logger.debug(f'{self.module_name};{msg} {categ}')
             
                 # Export message to categ queue
                 self.process.populate_set_out(msg, categ)
 
-                self.redis_logger.info(
-                    'Categ;{};{};{};Detected {} as {};{}'.format(
-                        paste.p_source, paste.p_date, paste.p_name,
-                        lenfound, categ, paste.p_rel_path))
+                self.redis_logger.info(f'Categ;{paste.p_source};{paste.p_date};{paste.p_name};Detected {lenfound} as {categ};{paste.p_rel_path}')
 
         if not is_categ_found:
-            self.redis_logger.debug('No %s found in this paste: %s'%(self.module_name, paste.p_name))
+            self.redis_logger.debug(f'No {self.module_name} found in this paste: {paste.p_name}')
 
 
 if __name__ == '__main__':

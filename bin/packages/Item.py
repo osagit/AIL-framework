@@ -125,7 +125,7 @@ def get_item_content_beautifulsoup(item_id, item_content=None):
     """
     if not item_content:
         item_content = get_item_content(item_id)
-    soup = BeautifulSoup(item_content)
+    soup = BeautifulSoup(item_content, features="lxml")
     # Add newline to br tags to avoid string concatenation by beautifulsoup 
     #   possible other newlines for tags ["a", "p", "div", "h3", "br"]
     for elem in soup.find_all(["br"]):

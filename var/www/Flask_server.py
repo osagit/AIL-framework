@@ -84,8 +84,8 @@ if not os.path.isdir(log_dir):
 # =========       =========#
 
 # =========  TLS  =========#
-ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-ssl_context.load_cert_chain(certfile=os.path.join(Flask_dir, 'server.crt'), keyfile=os.path.join(Flask_dir, 'server.key'))
+# ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+# ssl_context.load_cert_chain(certfile=os.path.join(Flask_dir, 'server.crt'), keyfile=os.path.join(Flask_dir, 'server.key'))
 #print(ssl_context.get_ciphers())
 # =========       =========#
 
@@ -258,4 +258,5 @@ r_serv_db.sadd('list_export_tags', 'infoleak:submission="manual"')
 # ============ MAIN ============
 
 if __name__ == "__main__":
-    app.run(host=host, port=FLASK_PORT, threaded=True, ssl_context=ssl_context, debug=True)
+    # app.run(host=host, port=FLASK_PORT, threaded=True, ssl_context=ssl_context)
+    app.run(host=host, port=FLASK_PORT, threaded=True, debug=True)

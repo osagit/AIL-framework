@@ -49,6 +49,7 @@ class ComboLeak(AbstractModule):
         company_name: str; the name of the company or group (orange, gafa, frenchisp, ...)
         mail_domains: str array; the list of company mail domains (gmail, amazon, hotmail, orange, wanadoo, ...)
         """
+        # logger_channel='script:combo'
         super(ComboLeak, self).__init__(logger_channel='script:combo')
 
         self.domains = self.__init_mail_domains()
@@ -64,8 +65,11 @@ class ComboLeak(AbstractModule):
         # Add cache for regex
         self.redis_cache_key = regex_helper.generate_redis_cache_key(self.module_name)
 
+        # Checking if a RediSearch index exists
+        # https://github.com/RediSearch/redisearch-py
+
         # LOAD Redis/ARDB Company
-        self.db = ConfigLoader.ConfigLoader().get_redis_conn("ARDB_Orange")
+        self.db = ConfigLoader.ConfigLoader().get_redis_conn("Redis_Search_Orange")
 
         self.cipher = self.__init_cipher()
 
@@ -161,13 +165,15 @@ class ComboLeak(AbstractModule):
         #     self.week_day = time.strftime("%U", time.localtime())
         #     self.db.set(self.REDIS_KEY_CREDENTIALS_INDEX_WEEKLY, 0)
 
-        if all_credentials and len(all_credentials) > 0:
+        nb_all_cred = len(all_credentials)
+        if all_credentials and nb_all_cred > 0:
             
-            self.redis_logger.info(f'{self.module_name}; Checked {len(all_credentials)} credentials found.')
+            self.redis_logger.info(f'{self.module_name}; Checked {nb_all_cred} credentials found.')
 
             source = Item.get_source(item_id)
+            
+            self.redis_logger.warning(f'{self.module_name};{source};{Item.get_item_date(item_id)};{Item.get_item_basename(item_id)};{message};{item_id}')
 
-            self.redis_logger.debug(f'{self.module_name};{source};{Item.get_item_date(item_id)};{Item.get_item_basename(item_id)};{message};{item_id}')
             self.redis_logger.debug(f'get_item_filename: {Item.get_item_filename(item_id)}')
             self.redis_logger.debug(f'get_item_size: {Item.get_item_size(item_id)}')
             self.redis_logger.debug(f'get_item_nb_duplicates: {Item.get_item_nb_duplicates(item_id)}')
@@ -184,98 +190,115 @@ class ComboLeak(AbstractModule):
             # Init tag messages to send
             msg_tag = set()
 
-            # TODO stats ?
-            for cred in all_credentials:
- 
-                # Split credentials in email, domain and password
-                credentials = re.findall(self.regex_split_credentials, cred)
-                self.redis_logger.info(f'credentials: {credentials}')
+            # Execute redis command in bulk
+            with self.db.pipeline() as pipe:
+                # TODO stats ?
+                for cred in all_credentials:
+    
+                    # Split credentials in email, domain and password
+                    credentials = re.findall(self.regex_split_credentials, cred)
+                    self.redis_logger.info(f'credentials: {credentials}')
 
-                # Extract email domain, domain without TLD and password
-                email, domaintld, domain, password = credentials[0]
-                self.redis_logger.info(f'email: {email}')
-                self.redis_logger.info(f'domain TLD: {domaintld}')
-                self.redis_logger.info(f'domain: {domain}')
-                self.redis_logger.info(f'password: {password}')
-                
-                # key_id is the hash of salted email+password
-                #   item_id
-                # TODO distinguish uuid key and mail pass hash ?
-                #   get UUID # UUID = str(uuid.uuid4())
-                key_id = self.render_hmac(email, password)
-                self.redis_logger.debug(f'key hashed: {key_id}')
-
-                # TODO get company name
-                company_name = self.get_company_name(domain)
-
-                # Add tag to list of message tag if not already added
-                msg_tag.add(f'infoleak:automatic-detection="{company_name}-credentials";{item_id}')
-
-                # Unique number attached to unique hash tuple email/password
-                # key_index = self.db.sadd(self.REDIS_KEY_CREDENTIALS_INDEX_SET, key_id)
-                # self.redis_logger.debug(f'key index: {key_index}')
-
-                namespace = f'credentials:{company_name}'
-                 # SortedSet of daily found paste
-                self.db.zincrby(f'{namespace}:stat:dailyleak', now_day)
-
-                # Test if hashed key is already known in SortedSet of hashed keys
-                #   INCRBY returns 1 if hashed key do not exists
-                #                  > 1 if already encountered
-                # Counter of Key_id is directely incremented in the test above
-                # SortedSet of Credentials IDs (Salted email password HMAC)
-                if 1 == self.db.zincrby(f'{namespace}:index', key_id):
-
-                    # Increment Weekly mail found counter
-                    # TODO time series
-                    # self.db.incr(self.REDIS_KEY_CREDENTIALS_INDEX_WEEKLY)
-                    # SortedSet of Uniq daily found paste
-                    self.db.zincrby(f'{namespace}:stat:dailyleakunicity', now_day)
-
-                    # cipher data with RSA, it return the cipher data
-                    cipher_email = self.cipher.encrypt(email.encode())
-                    self.redis_logger.debug(f'cipher_email: {cipher_email}')
-                    cipher_password = self.cipher.encrypt(password.encode())
-                    self.redis_logger.debug(f'cipher_password: {cipher_password}')
+                    # Extract email domain, domain without TLD and password
+                    email, domaintld, domain, password = credentials[0]
+                    self.redis_logger.debug(f'email: {email}')
+                    self.redis_logger.debug(f'domain TLD: {domaintld}')
+                    self.redis_logger.debug(f'domain: {domain}')
+                    self.redis_logger.debug(f'password: {password}')
                     
-                    # Compute record mapping
-                    record = {
-                        "pasteName": f"{Item.get_item_basename(item_id)}",
-                        "source": f"{source}",
-                        "cipher_email": f"{cipher_email}",
-                        "cipher_password": f"{cipher_password}",
-                        "first_seen" : f"{now}",
-                        "last_seen" : f"{now}",
-                        "checked": 'false'
-                    }
-                    # Put first seen with the item date ?
-                    # "first_seen" : "%s"%(Item.get_item_date(item_id)),
+                    # key_id is the hash of salted email+password
+                    #   item_id
+                    # TODO distinguish uuid key and mail pass hash ?
+                    #   get UUID # UUID = str(uuid.uuid4())
+                    key_id = self.render_hmac(email, password)
+                    self.redis_logger.debug(f'key hashed: {key_id}')
 
-                    # Set key to value within hash name, mapping accepts a dict of key/value pairs that that will be added to hash name. 
-                    # Returns the number of fields that were added
-                    # Add the mapping between the credential and the path
-                    # TODO add TTL
-                    # HashSet of all Credentials records
-                    self.db.hmset(f'{namespace}:record:{key_id}', mapping=record)
+                    # TODO get company name
+                    company_name = self.get_company_name(domain)
 
-                    # SortedSet for domains (gmail.fr, hotmail.com, other.fr, ...)
-                    # Getting domains score:
-                    #   REDIS > ZREVRANGE credentials:company_name:domain 0 -1 WITHSCORES
-                    # Increment gmail.fr domain score:
-                    #   ZINCRBY credentials:company_name:domain 1 gmail.fr
-                    # Increment (default 1) domain in sortedset
-                    # TODO put in stat redis db
-                    self.db.zincrby(f'{namespace}:stat:domain', domaintld.lower(), amount=1)
+                    # Add tag to list of message tag if not already added
+                    msg_tag.add(f'infoleak:automatic-detection="{company_name}-credentials";{item_id}')
 
-                    # Increment (default 1) source in sortedset
-                    # TODO put in stat redis db
-                    self.db.zincrby(f'{namespace}:stat:source', source.lower(), amount=1)
+                    # Unique number attached to unique hash tuple email/password
+                    # key_index = pipe.sadd(self.REDIS_KEY_CREDENTIALS_INDEX_SET, key_id)
+                    # self.redis_logger.debug(f'key index: {key_index}')
 
-                else:
-                    # Update last_seen of these credentials
-                    self.db.hset(f'{namespace}:record:{key_id}', "last_seen", now)
+                    namespace = f'credentials:{company_name}'
+                    # SortedSet of daily found paste
+                    pipe.zincrby(f'{namespace}:stat:dailyleak', now_day)
 
-                # self.process.populate_set_out(credentials, 'Company')
+                    # Test if hashed key is already known in SortedSet of hashed keys
+                    #   INCRBY returns 1 if hashed key do not exists
+                    #                  > 1 if already encountered
+                    # Counter of Key_id is directely incremented in the test above
+                    # SortedSet of Credentials IDs (Salted email password HMAC)
+                    #  not in pipe, should be executed first
+                    if 1 == self.db.zincrby(f'comboleak:index', key_id):
+
+                        # Increment Weekly mail found counter
+                        # TODO time series
+                        # pipe.incr(self.REDIS_KEY_CREDENTIALS_INDEX_WEEKLY)
+                        # SortedSet of Uniq daily found paste
+                        pipe.zincrby(f'{namespace}:stat:dailyleakunicity', now_day)
+
+                        # Index by timestamp
+                        pipe.zadd(f'comboleak:timestamp:index', f"{now}", f"{key_id}")
+                        # Index by domain
+                        pipe.zadd(f'comboleak:domaintld:index', 0, f"{domaintld}:{key_id}")
+
+                        # cipher data with RSA, it return the cipher data
+                        cipher_email = self.cipher.encrypt(email.encode())
+                        self.redis_logger.debug(f'cipher_email: {cipher_email}')
+                        cipher_password = self.cipher.encrypt(password.encode())
+                        self.redis_logger.debug(f'cipher_password: {cipher_password}')
+                        
+                        # Compute record mapping
+                        record = {
+                            "id" : f"{key_id}",
+                            "paste_name": f"{Item.get_item_basename(item_id)}",
+                            "paste_path": f"{item_id}",
+                            "source": f"{source}",
+                            "domain_tld": f"{domaintld}",
+                            "cipher_email": f"{cipher_email}",
+                            "cipher_password": f"{cipher_password}",
+                            "email": f"{email}",
+                            "password": f"{password}",
+                            "first_seen" : f"{now}",
+                            "last_seen" : f"{now}",
+                            "checked": 'false'
+                        }
+                        # Put first seen with the item date ?
+                        # "first_seen" : "%s"%(Item.get_item_date(item_id)),
+
+                        # Set key to value within hash name, mapping accepts a dict of key/value pairs that that will be added to hash name. 
+                        # Returns the number of fields that were added
+                        # Add the mapping between the credential and the path
+                        # TODO add TTL
+                        # HashSet of all Credentials records
+                        # pipe.hmset(f'{namespace}:record:{key_id}', mapping=record)
+                        pipe.hmset(f'comboleak:record:{key_id}', mapping=record)
+
+                        # SortedSet for domains (gmail.fr, hotmail.com, other.fr, ...)
+                        # Getting domains score:
+                        #   REDIS > ZREVRANGE credentials:company_name:domain 0 -1 WITHSCORES
+                        # Increment gmail.fr domain score:
+                        #   ZINCRBY credentials:company_name:domain 1 gmail.fr
+                        # Increment (default 1) domain in sortedset
+                        # TODO put in stat redis db
+                        pipe.zincrby(f'{namespace}:stat:domain', domaintld.lower(), amount=1)
+
+                        # Increment (default 1) source in sortedset
+                        # TODO put in stat redis db
+                        pipe.zincrby(f'{namespace}:stat:source', source.lower(), amount=1)
+
+                    else:
+                        # Update last_seen of these credentials
+                        pipe.hset(f'comboleak:record:{key_id}', "last_seen", now)
+
+                    # self.process.populate_set_out(credentials, 'Company')
+
+                # Send all transactions to redis
+                pipe.execute()
 
             # Send item to duplicate
             self.process.populate_set_out(item_id, 'Duplicate')

@@ -35,7 +35,7 @@ class CreditCards(AbstractModule):
     """
 
     def __init__(self):
-        super(CreditCards, self).__init__()
+        super(CreditCards, self).__init__(logger_channel='script:creditcard')
 
         # Source: http://www.richardsramblings.com/regex/credit-card-numbers/
         cards = [
@@ -63,7 +63,7 @@ class CreditCards(AbstractModule):
         all_cards = re.findall(self.regex, content)
 
         if len(all_cards) > 0:
-            self.redis_logger.debug('All matching', all_cards)
+            self.redis_logger.debug(f'All matching {all_cards}')
             creditcard_set = set([])
 
             for card in all_cards:
@@ -71,7 +71,7 @@ class CreditCards(AbstractModule):
                 # TODO purpose of this assignation ?
                 clean_card = clean_card
                 if lib_refine.is_luhn_valid(clean_card):
-                    self.redis_logger.debug(clean_card, 'is valid')
+                    self.redis_logger.debug(f'{clean_card} is valid')
                     creditcard_set.add(clean_card)
 
             pprint.pprint(creditcard_set)

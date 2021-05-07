@@ -1,0 +1,209 @@
+<!-- Sidebar -->
+<ul class="navbar-nav bg-gradient-secondary sidebar sidebar-dark accordion" id="accordionSidebar">
+
+    <!-- Sidebar - Brand -->
+    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{{ url_for('dashboard.index') }}">
+        <div class="sidebar-brand-icon">
+            <img src="{{ url_for('static', filename='orange/img/logo.svg')}}" alt="Orange" style="width:40px;">
+        </div>
+        <!--rotate-n-15-->
+        <div class="sidebar-brand-text mx-2">Leak Hunter<sup><i class="fas fa-crosshairs"></i></sup></div>
+    </a>
+
+    <!-- Divider -->
+    <hr class="sidebar-divider my-0">
+
+    <!-- Nav Item - Dashboard -->
+    <li class="nav-item" id="page-Dashboard">
+        <a class="nav-link" href="{{ url_for('dashboard.index') }}">
+            <i class="fas fa-fw fa-tachometer-alt"></i>
+            <span>Dashboard</span></a>
+    </li>
+
+    <!-- Divider -->
+    <hr class="sidebar-divider">
+
+    <!-- Nav Item - Credentials -->
+    <li class="nav-item" id="page-Credentials">
+        <a class="nav-link" href="#" data-toggle="collapse" data-target="#collapseCredentials" aria-expanded="true"
+            aria-controls="collapseCredentials">
+            <i class="fas fa-fw fa-unlock-alt"></i>
+            <span>Credentials</span></a>
+        <div id="collapseCredentials" class="collapse" aria-labelledby="headingCredentials"
+            data-parent="#accordionSidebar">
+            <div class="bg-white py-2 collapse-inner rounded">
+                <a class="collapse-item" href="{{ url_for('comboleak.index_page', company_name='orange') }}"><i
+                        class="fas fa-fw fa-address-book"></i>
+                    Orange</a>
+                <a class="collapse-item" href="{{ url_for('comboleak.index_page', company_name='gafa') }}"><i
+                        class="fas fa-fw fa-cookie-bite"></i>
+                    Gafa</a>
+                <a class="collapse-item"
+                    href="{{ url_for('comboleak.index_page', company_name='frenchisp') }}"><i
+                        class="fas fa-fw fa-broadcast-tower"></i> French ISP</a>
+                <a class="collapse-item"
+                    href="{{ url_for('comboleak.index_page', company_name='foreigncie') }}"><i
+                        class="fas fa-fw fa-at"></i> Foreign Company</a>
+            </div>
+        </div>
+    </li>
+
+    <!-- Divider -->
+    <hr class="sidebar-divider">
+
+    <!-- Nav Item - Tags -->
+    <li class="nav-item" id="navbar-tags">
+        <a class="nav-link" href="#" data-toggle="collapse" data-target="#collapseTag" aria-expanded="true"
+            aria-controls="collapseTag">
+            <i class="fas fa-fw fa-tag"></i>
+            <span>Tags</span></a>
+        <div id="collapseTag" class="collapse" aria-labelledby="headingTag" data-parent="#accordionSidebar">
+            <div class="bg-white py-2 collapse-inner rounded">
+                <h6 class="collapse-header">Quick Search:</h6>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22orange-credentials%22"><i
+                        class="fas fa-address-book"></i> Orange Credentials</a>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22gafa-credentials%22"><i
+                        class="fas fa-cookie-bite"></i> GAFA Credentials</a>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22frenchisp-credentials%22"><i
+                        class="fas fa-broadcast-tower"></i> French ISP Credentials</a>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22foreigncie-credentials%22"><i
+                        class="fas fa-at"></i> Foreign Cie Credentials</a>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22credential%22"><i
+                        class="fas fa-unlock-alt"></i> Credentials</a>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22credit-card%22"><i
+                        class="fas fa-credit-card"></i> Credit cards</a>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22mail%22"><i
+                        class="fas fa-envelope"></i> Mails</a>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22onion%22"><i
+                        class="fas fa-user-secret"></i> Onions</a>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22cve%22"><i
+                        class="fas fa-bug"></i> CVEs</a>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22bitcoin-address%22"><i
+                        class="fab fa-bitcoin"></i> Bitcoin</a>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22base64%22"><i
+                        class="fas fa-lock-open"></i> Base64</a>
+                <a class="collapse-item"
+                    href="{{url_for('tags_ui.get_obj_by_tags')}}?object_type=item&ltags=infoleak:automatic-detection=%22phone-number%22"><i
+                        class="fas fa-phone"></i> Phones</a>
+                <h6 class="collapse-header">Tags Search:</h6>
+                <a class="collapse-item" href="{{ url_for('tags_ui.tags_search_items') }}"><i class="fas fa-file"></i>
+                    Items by Tags</a>
+                <a class="collapse-item" href="{{ url_for('tags_ui.tags_search_domains') }}"><i
+                        class="fab fa-html5"></i> Domains by Tags</a>
+                <a class="collapse-item" href="{{ url_for('tags_ui.tags_search_decoded') }}"><i
+                        class="fas fa-lock-open"></i> Decoded Items by Tags</a>
+            </div>
+        </div>
+    </li>
+
+    <!-- Nav Item - Leaks -->
+    <li class="nav-item" id="page-Tracker">
+        <a class="nav-link" href="#" data-toggle="collapse" data-target="#collapseTracker" aria-expanded="true"
+            aria-controls="collapseTracker">
+            <i class="fas fa-fw fa-filter"></i>
+            <span>Filters</span></a>
+        <div id="collapseTracker" class="collapse" aria-labelledby="headingTracker" data-parent="#accordionSidebar">
+            <div class="bg-white py-2 collapse-inner rounded">
+                <a class="collapse-item" href="{{url_for('hunter.tracked_menu')}}"><i class="fas fa-ruler-combined"></i>
+                    All Filters</a>
+                <a class="collapse-item" href="{{url_for('hunter.tracked_menu_word')}}"><i class="fas fa-font"></i>
+                    Words</a>
+                <a class="collapse-item" href="{{url_for('hunter.tracked_menu_set')}}"><i
+                        class="fas fa-layer-group"></i> Set</a>
+                <a class="collapse-item" href="{{url_for('hunter.tracked_menu_regex')}}"><i
+                        class="fas fa-ruler-vertical"></i> Regex</a>
+                <a class="collapse-item" href="{{url_for('hunter.tracked_menu_yara')}}"><i class="fas fa-ruler"></i>
+                    YARA</a>
+            </div>
+        </div>
+    </li>
+
+    <!-- Nav Item - Crawlers -->
+    <li class="nav-item" id="page-Crawler">
+        <a class="nav-link" href="#" data-toggle="collapse" data-target="#collapseCrawler" aria-expanded="true"
+            aria-controls="collapseCrawler">
+            <i class="fas fa-fw fa-spider"></i>
+            <span>Crawlers</span></a>
+        <div id="collapseCrawler" class="collapse" aria-labelledby="headingCrawler" data-parent="#accordionSidebar">
+            <div class="bg-white py-2 collapse-inner rounded">
+                <h6 class="collapse-header">Splash Crawlers:</h6>
+                <a class="collapse-item" href="{{url_for('hiddenServices.auto_crawler')}}"><i class="fas fa-search"></i>
+                    Dashboard</a>
+                <a class="collapse-item" href="{{url_for('hiddenServices.Crawler_Splash_last_by_type')}}?type=onion"><i
+                        class="fas fa-user-secret"></i>
+                    Onion Crawler</a>
+                <a class="collapse-item"
+                    href="{{url_for('hiddenServices.Crawler_Splash_last_by_type')}}?type=regular"><i
+                        class="fab fa-html5"></i> Regular Crawler</a>
+                <a class="collapse-item" href="{{url_for('crawler_splash.manual')}}"><i class="fas fa-spider"></i>
+                    Manual Crawler</a>
+                <a class="collapse-item" href="{{url_for('hiddenServices.auto_crawler')}}"><i class="fas fa-sync"></i>
+                    Automatic Crawler</a>
+                <h6 class="collapse-header">Domain Explorer:</h6>
+                <a class="collapse-item" href="{{url_for('crawler_splash.domains_explorer_onion')}}"><i
+                        class="fas fa-user-secret"></i>
+                    Onion Domain</a>
+                <a class="collapse-item" href="{{url_for('crawler_splash.domains_explorer_web')}}"><i
+                        class="fab fa-html5"></i>
+                    Web Domain</a>
+            </div>
+        </div>
+    </li>
+
+    <!-- Nav Item - Objects -->
+    <li class="nav-item" id="page-Decoded">
+        <a class="nav-link" href="{{ url_for('hashDecoded.hashDecoded_page') }}">
+            <i class="fas fa-fw fa-cube"></i>
+            <span>Objects</span></a>
+    </li>
+
+    <!-- Nav Item - Statistics -->
+    <li class="nav-item" id="page-Statistics">
+        <a class="nav-link" href="{{ url_for('trendingmodules.moduletrending') }}">
+            <i class="fas fa-fw fa-chart-bar"></i>
+            <span>Statistics</span></a>
+    </li>
+
+    <!-- Nav Item - Submit Paste -->
+    <li class="nav-item" id="page-items-submit">
+        <a class="nav-link" href="{{ url_for('PasteSubmit.PasteSubmit_page') }}">
+            <i class="fas fa-fw fa-file-upload"></i>
+            <span>Submit Paste</span></a>
+    </li>
+
+    <!-- Divider -->
+    <hr class="sidebar-divider">
+
+    <!-- Heading -->
+    <div class="sidebar-heading">
+        Settings
+    </div>
+
+    <!-- Nav Item - Server Management -->
+    <li class="nav-item" id="page-options">
+        <a class="nav-link" href="{{ url_for('settings.settings_page') }}">
+            <i class="fas fa-fw fa-cog"></i>
+            <span>Server Management</span></a>
+    </li>
+
+    <!-- Divider -->
+    <hr class="sidebar-divider d-none d-md-block">
+
+    <!-- Sidebar Toggler (Sidebar) -->
+    <div class="text-center d-none d-md-inline">
+        <button class="rounded-circle border-0" id="sidebarToggle"></button>
+    </div>
+
+</ul>
+<!-- End of Sidebar -->

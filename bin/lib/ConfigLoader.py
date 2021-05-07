@@ -39,7 +39,8 @@ class ConfigLoader(object):
         return redis.StrictRedis( host=self.cfg.get(redis_name, "host"),
                                   port=self.cfg.getint(redis_name, "port"),
                                   db=self.cfg.getint(redis_name, "db"),
-                                  decode_responses=decode_responses )
+                                  decode_responses=decode_responses,
+                                  retry_on_timeout=True )
 
     def get_files_directory(self, key_name):
         directory_path = self.cfg.get('Directories', key_name)

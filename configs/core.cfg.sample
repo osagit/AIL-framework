@@ -212,16 +212,6 @@ host = localhost
 port = 6382
 db = 10
 
-[ARDB_Orange]
-host = localhost
-port = 6382
-db = 11
-
-[Kvrocks_Meta]
-host = localhost
-port = 6383
-db = 0
-
 [Url]
 cc_critical = DE
 
@@ -296,5 +286,5 @@ TEXT_MAX_SIZE = 1000000
 # 1 Gb Max file size for file submission
 FILE_MAX_SIZE = 1000000000
 # Managed file extenions for file submission, comma separated
-# TODO add 'zip', 'gz' and 'tar.gz'
-FILE_ALLOWED_EXTENSIONS = 'txt','sh','pdf'
+# TODO add zip, gz and tar.gz
+FILE_ALLOWED_EXTENSIONS = txt,sh,pdf
