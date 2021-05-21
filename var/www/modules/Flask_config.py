@@ -10,6 +10,7 @@
 import os
 import re
 import sys
+import yaml
 
 ##################################
 # Import Project packages
@@ -148,3 +149,26 @@ except:
     vt_auth = {'apikey': config_loader.get_config_str("Flask", "max_preview_char")}
     vt_enabled = False
     print('VT submission is disabled')
+
+
+def init_mail_domains():
+    """
+    Init Domain list from yaml config file
+    """
+    result = None
+
+    # combo leak domains file path
+    comboleak_filepath = os.path.join(os.environ['AIL_HOME'], config_loader.get_config_str("ComboLeak", "comboleakfile"))
+    
+    # Get all domains from comboleakfile
+    with open(comboleak_filepath, 'r') as domains_file:
+        result = yaml.safe_load(domains_file)
+    
+    # Log at start
+    for key, value in result.items():
+        redis_logger.info(f"{key}: {value}")
+    
+    return result
+
+COMBOLEAK_PERIMETERS = init_mail_domains()
+

@@ -5,18 +5,31 @@
     Flask functions and routes for the rest api
 '''
 
+##################################
+# Import External packages
+##################################
 import os
 import re
 import sys
 import uuid
 import json
 import redis
-import datetime
 import time
+from flask import Flask, render_template, jsonify, request, Blueprint, redirect, url_for, Response, abort
+from flask_login import login_required
+from functools import wraps
+# from flask_swagger_ui import get_swaggerui_blueprint
+from redis import ResponseError
+# from redisearch import Client
+from redisearch import *
+from redisearch.aggregation import AggregateRequest, Asc
 
+
+##################################
+# Import Project packages
+##################################
 sys.path.append(os.path.join(os.environ['AIL_BIN'], 'lib/'))
 import Domain
-
 import Import_helper
 import Cryptocurrency
 import Pgp
@@ -24,22 +37,10 @@ import Item
 import Paste
 import Tag
 import Term
-
 sys.path.append(os.path.join(os.environ['AIL_BIN'], 'import'))
 import importer
-
-
-from flask import Flask, render_template, jsonify, request, Blueprint, redirect, url_for, Response
-from flask_login import login_required
-
-from functools import wraps
-
-##################################
-# Import External packages
-##################################
-from redis import ResponseError
-from redisearch import Client
-from redisearch.aggregation import AggregateRequest, Asc
+from validators import *
+from redis_serializer import *
 
 # ============ VARIABLES ============
 import Flask_config
@@ -202,6 +203,11 @@ def one():
 #           }
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+# @restApi.errorhandler(404)
+# def resource_not_found(e):
+#     return jsonify(error=str(e)), 404
+
 @restApi.route("api/v1/get/item", methods=['POST'])
 @token_required('read_only')
 def get_item_id():
@@ -643,57 +649,228 @@ def v1_ping():
 #           }
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+object_dict = lambda o: {key.lstrip('_'): value for key, value in o.__dict__.items()}
+
 @restApi.route("api/v1/comboleak", methods=['GET'])
 @token_required('read_only')
+@requires_validation(valid_comboleak_get_params, with_route_params=True)
 def get_comboleaks():
-    company = request.args.get('company')
-    print(company)
-    since = request.args.get('since')
-    print(since)
-
+    """
+    Return combo leaks
+    need params perimeters and since
+    """
     result = 'pong'
-    # now = int(time.time())
-    now = datetime.datetime.strptime('2021-01-04T16:41:24+0200', "%Y-%m-%dT%H:%M:%S%z")
-    now = date_timestamp = datetime.datetime.fromisoformat(since).timestamp()
-    print(now)
+
+    # TODO validate entry with wrapper
+    perimeters = request.args.get('perimeters')
+    perimeters = perimeters.split(";")
+    print(f'perimeters {perimeters}')
+
+    domain_searched = []
+    for perim in perimeters:
+        print(perim)
+        if perim in Flask_config.COMBOLEAK_PERIMETERS.keys():
+            domain_searched = unionlst(domain_searched, Flask_config.COMBOLEAK_PERIMETERS.get(perim))
+    
+    if domain_searched:
+
+        print(f'domain_searched {domain_searched}')
+
+        # modifiedList = list(map(lambda x: x + '_' , list1))
+        searchstr = " | ".join(domain_searched)
+        searchstr = searchstr.replace(".", "\\.")
+        searchstr = searchstr.replace("-", "\\-")
+        # searchstr = f'@domain_tld:{{ {searchstr} }}'
+        print(searchstr)
+        # Extract all perimeters
+        # domains = '|'.join(perimeters)
+
+        # Extract iso date as timestamp
+        # Unix timestamps in seconds localtime
+        since = request.args.get('since')
+        result = time.strptime(since, "%Y-%m-%dT%H:%M:%S")
+        date_timestamp = int(time.mktime(result))
+        print(date_timestamp)
+
+        query = f'@domain_tld:{{ {searchstr} }}'
+
+        account = request.args.get('account')
+        if account:
+            account = account.replace(".", "\\.")
+            account = account.replace("-", "\\-")
+            query += f'@local:{{ {account} }}'
+
+        # Load redisearch client
+        client = Client('myrecidx', port=6383)
+
+        try:
+
+            # TODO test perf with filter in dedicated perimeter index vs generic index with query
+
+            # FT.CREATE myrecidx ON HASH PREFIX 1 comboleak:record: first_seen NUMERIC domain_tld TAG local TAG
+            
+            # TODO return only a part of cipher_email ?
+            # 
+            # f'@domain_tld:{{ {searchstr} }}'
+            # searchstr = 'ymail\\.com | gmail\\.com'
+            q2 = Query(query).add_filter(NumericFilter('first_seen', date_timestamp, NumericFilter.INF, minExclusive=True)).sort_by('first_seen', asc=True).paging(0, 10000).return_fields('cid', 'local', 'domain_tld', 'first_seen', 'cipher_password')
+
+            redis_resp = client.search(q2)
+            # print(redis_resp)
+            if redis_resp:
+                print(redis_resp.total)
+                result = json.dumps(redis_resp, allow_nan=False, sort_keys=False, indent=4, cls=MyEncoder)
+
+        except ResponseError as err:
+            # Index does not exist. We need to create it!
+            result = err
+    else:
+        # 404 Not Found
+        print(json.dumps('{"error":"not found", "error_description:"The perimeter(s) does not exist"}'))
+        return Response(json.dumps({'error':'not found', 'error_description':'The perimeter(s) does not exist'}, indent=2, sort_keys=True), mimetype='application/json'), 404
+
+    return Response(result, mimetype='application/json'), 200
 
 
-    # with redis_search_orange as r:
-
-    client = Client('record-idx', port=6383)
+@restApi.route("api/v1/comboleak/<leak_id>", methods=['GET'])
+@token_required('read_only')
+# @requires_validation(valid_comboleak_get_params, with_route_params=True)
+def get_one_comboleak(leak_id):
+    """
+    Return a combo leak from given id
+    """
+    result = 'pong'
+    print(f'{leak_id}')
+    # Load redis client
     try:
-        info = client.info()
-        for k in [  'index_name', 'index_options', 'fields', 'num_docs',
-                    'max_doc_id', 'num_terms', 'num_records', 'inverted_sz_mb',
-                    'offset_vectors_sz_mb', 'doc_table_size_mb', 'key_table_size_mb',
-                    'records_per_doc_avg', 'bytes_per_record_avg', 'offsets_per_term_avg',
-                    'offset_bits_per_record_avg' ]:
-            print(info[k])
-        
-        # FT.AGGREGATE record-idx 
-        # "@first_seen:[00010 +inf]" 
-        # APPLY timefmt(@first_seen) AS recorded_date 
-        # GROUPBY 1 @recorded_date
-        # REDUCE COUNT 0 AS num_recorded
-        # SORTBY 2 @recorded_date ASC
-        # req = AggregateRequest(f'@first_seen:[{now} +inf]').group_by(
-        #     ['@published_year'], reducers.avg('average_rating').alias('average_rating_for_year')
-        # ).sort_by(
-        #     Asc('@average_rating_for_year')
-        # ).filter('@average_rating_for_year > 3')
-        result = client.search(f'@first_seen:[{now} +inf]')
-        print(result)
+        result = redis_search_orange.hgetall(f'comboleak:record:{leak_id}')
+
+        if result:
+            print(result)
+            result = json.dumps(result, allow_nan=False, sort_keys=False, indent=4)
+        else:
+            # 404 Not Found
+            print(json.dumps('{"error":"not found", "error_description:"The leak id does not exist"}'))
+            return Response(json.dumps({'error':'not found', 'error_description':'The leak id does not exist'}, indent=2, sort_keys=True), mimetype='application/json'), 404
+
     except ResponseError as err:
         # Index does not exist. We need to create it!
         result = err
 
-    return Response(json.dumps({'status': f'{result}'}), mimetype='application/json'), 200
-    # data = request.get_json()
-    # item_id = data.get('id', None)
-    # req_data = {'id': item_id, 'date': False, 'tags': True}
-    # res = Item.get_item(req_data)
-    # return Response(json.dumps(res[0], indent=2, sort_keys=True), mimetype='application/json'), res[1]
+    return Response(result, mimetype='application/json'), 200
 
+
+@restApi.route("api/v1/comboleak/domain", methods=['GET'])
+@token_required('read_only')
+def get_comboleaks_bydomain():
+    """
+    api/v1/comboleak/domain?since=2021-05-17T07:41:24&domain=hotmail&tld=com
+    Return combo leaks
+    need params perimeters and since
+    """
+    result = 'pong'
+
+    # TODO validate entry with wrapper
+    domain = request.args.get('domain')
+    print(f'domain {domain}')
+
+    tld = request.args.get('tld')
+    print(f'tld {tld}')
+
+    query = f'@domain:%{domain}% @tld:%{tld}%'
+
+    variant = request.args.get('variant')
+    if variant and variant=='true':
+        print(f'variant {variant}')
+        query += f' -@domain:{domain}'
+
+    print(query)
+
+    # Extract iso date as timestamp
+    # Unix timestamps in seconds localtime
+    since = request.args.get('since')
+    result = time.strptime(since, "%Y-%m-%dT%H:%M:%S")
+    date_timestamp = int(time.mktime(result))
+    print(date_timestamp)
+
+    recindex = 'reclevenidx'
+
+    # Load redisearch client
+    client = Client(recindex, port=6383)
+
+    try:
+
+        # FT.CREATE reclevenidx ON HASH PREFIX 1 "comboleak:record:" SCHEMA domain TEXT NOSTEM SORTABLE tld TEXT NOSTEM SORTABLE first_seen NUMERIC
+        # TODO don't filter on tld if not provided
+        # FT.SEARCH reclevenidx '@domain:%wanadoo% @tld:%fr% -@domain:wanadoo' FILTER first_seen 1621230084 +inf RETURN 1 email SORTBY first_seen LIMIT 0 10
+        #  -@domain:{domain}
+        q2 = Query(query).add_filter(NumericFilter('first_seen', date_timestamp, NumericFilter.INF, minExclusive=True)).sort_by('first_seen', asc=True).paging(0, 10000).return_fields('cid', 'local', 'domain_tld', 'first_seen', 'cipher_password')
+
+        redis_resp = client.search(q2)
+        # print(redis_resp)
+        if redis_resp:
+            # redis_resp.__class__ = ComboLeakResult
+            # print(redis_resp.diameter())
+        
+            # print(redis_resp.total)
+            # print(type(redis_resp))
+            # result = json.dumps(redis_resp, default=object_dict, allow_nan=False, sort_keys=False, indent=4)
+
+            result = json.dumps(redis_resp, allow_nan=False, sort_keys=False, indent=4, cls=MyEncoder)
+
+    except ResponseError as err:
+        # Index does not exist. We need to create it!
+        result = err
+
+    return Response(result, mimetype='application/json'), 200
+
+
+# def serialize_custom_object(o):
+#     res = o.__dict__.copy()
+#     res['machines'] = res['_machines']
+#     del res['_machines']
+#     return res
+
+# json.dumps(object, sort_keys=True,indent=4, separators=(',', ': '), 
+#            default=serialize_custom_object)
+
+class MyEncoder(json.JSONEncoder):
+    def default(self, o):
+        # print(o.total)
+        # for x in o.docs:
+        #     print(x.id)
+        # return {'total': o.total}
+        return {'total': o.total, 'leaks': [self.to_json(x) for x in o.docs]}
+    def to_json(self, doc):
+        """
+        Build JSON representation of the Demand
+        """
+        serializer = JsonSerializer()
+        serializer.start_object(doc.cid)
+        serializer.add_property("account", doc.local)
+        serializer.add_property("domain_tld", doc.domain_tld)
+        serializer.add_property("first_seen", int(doc.first_seen))
+        serializer.add_property("cipher_password", doc.cipher_password)
+
+        return serializer._json_object
+
+class ComboLeakResult(Result):
+    def diameter(self):
+        return self.total*2
+
+
+class ComplexEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, ComboLeakResult):
+            return {'total': obj.total }
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, obj)
+
+# Python program to illustrate union
+# Without repetition 
+def unionlst(lst1, lst2):
+    final_list = list(set(lst1) | set(lst2))
+    return final_list
 
 # ========= REGISTRATION =========
 app.register_blueprint(restApi, url_prefix=baseUrl)

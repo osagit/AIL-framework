@@ -282,7 +282,7 @@ class SubmitPaste(AbstractModule):
             # file not exists in AIL paste directory
             self.redis_logger.debug(f"new paste {paste_content}")
 
-            gzip64encoded = self._compress_encode_content(paste_content)
+            gzip64encoded = self._compress_encode_content(uuid, paste_content)
 
             if gzip64encoded:
 
@@ -322,7 +322,7 @@ class SubmitPaste(AbstractModule):
         return result
 
 
-    def _compress_encode_content(self, content):
+    def _compress_encode_content(self, uuid, content):
         gzip64encoded = None
 
         try:

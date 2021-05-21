@@ -23,6 +23,7 @@ from Crypto.Hash import HMAC, SHA256
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
 import yaml
+import binascii
 
 
 ##################################
@@ -31,9 +32,9 @@ import yaml
 from module.abstract_module import AbstractModule
 from packages import Paste
 from packages import Item
-import regex_helper
-import ConfigLoader
-
+from lib import regex_helper
+# import ConfigLoader
+from lib import ConfigLoader
 
 class ComboLeak(AbstractModule):
     """
@@ -59,7 +60,8 @@ class ComboLeak(AbstractModule):
         self.regex_cred = r'[a-zA-Z0-9\.\-_]{3,128}@(?i:[a-z0-9](?i:[a-z0-9-]{0,63}[a-z0-9])?)(?i:\.[a-z0-9][a-z0-9-]{0,12}[a-z0-9]){1,3}\s*(?:[\:\|]\s*[a-zA-z0-9&,\.;\+:!?\-_]{6,})'
         
         # Split credentials in 4 groups: email, domain, domain without TLD, password
-        self.regex_split_credentials = r'([a-zA-Z0-9\.\-_]{3,128}@(((?i:[a-z0-9](?i:[a-z0-9-]{0,63}[a-z0-9])?))(?i:\.[a-z0-9][a-z0-9-]{0,12}[a-z0-9]){1,3}))\s*(?:[\:\|]\s*([a-zA-z0-9&,\.;\+:!?\-_]{6,}))'
+        regex_split_cred = r'(([a-zA-Z0-9\.\-_]{3,128})@(((?i:[a-z0-9](?i:[a-z0-9-]{0,63}[a-z0-9])?))((?i:\.[a-z0-9][a-z0-9-]{0,12}[a-z0-9]){1,3})))\s*(?:[\:\|]\s*([a-zA-z0-9&,\.;\+:!?\-_]{6,}))'
+        self.regex_split_credentials = re.compile(regex_split_cred)
         # self.regex_split_credentials = r"(.*@((?i:%s)(?:\.\S+))+)\s*(?:[\:\|]\s*(.{6,}))"
 
         # Add cache for regex
@@ -122,6 +124,15 @@ class ComboLeak(AbstractModule):
         return result
 
 
+    def __cipher(self, password):
+        """
+        encode to base64 to avoid escape chars in cipher string
+        """
+        cipher = self.cipher.encrypt(password)
+        
+        return binascii.b2a_base64(cipher, newline=False)
+
+
     def render_hmac(self, email, password):
         """
         Create a Hash-based Message Authentication Code 
@@ -180,12 +191,14 @@ class ComboLeak(AbstractModule):
             self.redis_logger.debug(f'get_item_metadata: {Item.get_item_metadata(item_id)}')
        
             # Compute record mapping
+
             # current date and time
-            # now = datetime.timestamp(datetime.now())
+            # Unix timestamps in seconds GMT
             now = int(time.time())
 
             # Current date in YYMMdd
-            now_day = time.strftime("%Y%m%d", time.localtime())
+            # Expressed in seconds since the epoch in UTC in which the DST flag is always zero
+            now_day = time.strftime("%Y%m%d", time.gmtime())
 
             # Init tag messages to send
             msg_tag = set()
@@ -196,14 +209,16 @@ class ComboLeak(AbstractModule):
                 for cred in all_credentials:
     
                     # Split credentials in email, domain and password
-                    credentials = re.findall(self.regex_split_credentials, cred)
+                    credentials = self.regex_split_credentials.findall(cred)
                     self.redis_logger.info(f'credentials: {credentials}')
 
                     # Extract email domain, domain without TLD and password
-                    email, domaintld, domain, password = credentials[0]
+                    email, local, domaintld, domain, tld, password = credentials[0]
                     self.redis_logger.debug(f'email: {email}')
+                    self.redis_logger.debug(f'local: {local}')
                     self.redis_logger.debug(f'domain TLD: {domaintld}')
                     self.redis_logger.debug(f'domain: {domain}')
+                    self.redis_logger.debug(f'tld: {tld}')
                     self.redis_logger.debug(f'password: {password}')
                     
                     # key_id is the hash of salted email+password
@@ -217,7 +232,8 @@ class ComboLeak(AbstractModule):
                     company_name = self.get_company_name(domain)
 
                     # Add tag to list of message tag if not already added
-                    msg_tag.add(f'infoleak:automatic-detection="{company_name}-credentials";{item_id}')
+                    current_msg = f'infoleak:automatic-detection="{company_name}";{item_id}'
+                    msg_tag.add(current_msg)
 
                     # Unique number attached to unique hash tuple email/password
                     # key_index = pipe.sadd(self.REDIS_KEY_CREDENTIALS_INDEX_SET, key_id)
@@ -246,22 +262,22 @@ class ComboLeak(AbstractModule):
                         # Index by domain
                         pipe.zadd(f'comboleak:domaintld:index', 0, f"{domaintld}:{key_id}")
 
-                        # cipher data with RSA, it return the cipher data
-                        cipher_email = self.cipher.encrypt(email.encode())
-                        self.redis_logger.debug(f'cipher_email: {cipher_email}')
-                        cipher_password = self.cipher.encrypt(password.encode())
-                        self.redis_logger.debug(f'cipher_password: {cipher_password}')
+                        # cipher data with RSA, it return the cipher data base64 encoded
+                        cipher_password = self.__cipher(password.encode())
+                        self.redis_logger.debug(f'cipher_password: {cipher_password}')                        
                         
                         # Compute record mapping
+                            # "paste_name": f"{Item.get_item_basename(item_id)}",
                         record = {
-                            "id" : f"{key_id}",
-                            "paste_name": f"{Item.get_item_basename(item_id)}",
-                            "paste_path": f"{item_id}",
-                            "source": f"{source}",
-                            "domain_tld": f"{domaintld}",
-                            "cipher_email": f"{cipher_email}",
-                            "cipher_password": f"{cipher_password}",
+                            "cid" : f"{key_id}",
+                            "paste": f"{item_id}",
                             "email": f"{email}",
+                            "local": f"{local}",
+                            "source": f"{source}",
+                            "domain": f"{domain}",
+                            "domain_tld": f"{domaintld}",
+                            "tld": f"{tld}",
+                            "cipher_password": f"{cipher_password}",
                             "password": f"{password}",
                             "first_seen" : f"{now}",
                             "last_seen" : f"{now}",
